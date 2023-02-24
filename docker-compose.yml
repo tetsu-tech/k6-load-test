@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  k6:
+    image: loadimpact/k6:latest
+    container_name: k6
+    # entrypoint: k6 run --out statsd /scripts/performance-test.js
+    environment:
+      - K6_STATSD_ENABLE_TAGS=true
+      - K6_STATSD_ADDR=dd-agent:8125  # datadog-agent のアドレスと合わせる
+    volumes:
+      - ./scripts:/scripts
+    depends_on:
+      - dd-agent
+      - server
+
+  dd-agent:
+    image: gcr.io/datadoghq/agent:7
+    container_name: dd-agent
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /proc/:/host/proc/:ro
+      - /sys/fs/cgroup/:/host/sys/fs/cgroup:ro
+    environment:
+      - DD_API_KEY=${DD_API_KEY}
+      - DD_SITE=${DD_SITE}
+      - DD_DOGSTATSD_NON_LOCAL_TRAFFIC=1
+    env_file:
+      - .env
+    ports:
+      - "8125:8125/udp"
+
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: app
+    volumes:
+      - .:/var/www
